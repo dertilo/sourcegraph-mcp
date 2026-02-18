@@ -198,30 +198,34 @@ class SourcegraphMCPServer:
         ]
         await asyncio.gather(*tasks)
 
-    async def run(self) -> None:
+    async def run(self, stdio: bool = False) -> None:
         """Start the search server."""
         signal.signal(signal.SIGINT, lambda sig, frame: self.signal_handler(sig, frame))
         signal.signal(signal.SIGTERM, lambda sig, frame: self.signal_handler(sig, frame))
 
         self._register_tools()
-        self._register_health_endpoints()
 
-        try:
-            logger.info("Starting Sourcegraph MCP server...")
-            await self._run_server()
-        except KeyboardInterrupt:
-            logger.info("Received keyboard interrupt (CTRL+C)")
-        except Exception as exc:
-            logger.error(f"Server error: {exc}")
-            raise
-        finally:
-            logger.info("Server has shut down.")
+        if stdio:
+            logger.info("Starting Sourcegraph MCP server (stdio)...")
+            await self.server.run_stdio_async()
+        else:
+            self._register_health_endpoints()
+            try:
+                logger.info("Starting Sourcegraph MCP server...")
+                await self._run_server()
+            except KeyboardInterrupt:
+                logger.info("Received keyboard interrupt (CTRL+C)")
+            except Exception as exc:
+                logger.error(f"Server error: {exc}")
+                raise
+            finally:
+                logger.info("Server has shut down.")
 
 
-def main() -> None:
+def main(stdio: bool = False) -> None:
     config = ServerConfig()
     server = SourcegraphMCPServer(config)
-    asyncio.run(server.run())
+    asyncio.run(server.run(stdio=stdio))
 
 
 if __name__ == "__main__":
